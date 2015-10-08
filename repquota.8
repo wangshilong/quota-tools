@@ -59,7 +59,7 @@ printed is '-'. The second character denotes the state of inode usage
 analogously.
 
 .B repquota
-has to translate ids of all users/groups to names (unless option
+has to translate ids of all users/groups/projects to names (unless option
 .B -n
 was specified) so it may take a while to
 print all the information. To make translating as fast as possible
@@ -125,6 +125,9 @@ Quota format with 64-bit quota limits and usage,
 .B -g, --group
 Report quotas for groups.
 .TP
+.B -P, --project
+Report quotas for projects.
+.TP
 .B -u, --user
 Report quotas for users. This is the default.
 .TP
@@ -142,7 +145,7 @@ Only the super-user may view quotas which are not their own.
 .SH FILES
 .PD 0
 .TP 20
-.BR aquota.user " or " aquota.group
+.BR aquota.user ", " aquota.group " or " aquota.project
 quota file at the filesystem root (version 2 quota, non-XFS filesystems)
 .TP
 .BR quota.user " or " quota.group

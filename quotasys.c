@@ -138,14 +138,35 @@ gid_t group2gid(char *name, int flag, int *err)
 }
 
 /*
+ *	Convert project name to gid
+ */
+int project2pid(char *name, int flag, int *err)
+{
+	gid_t ret;
+	char *errch;
+
+	if (err)
+		*err = 0;
+	if (!flag) {
+		ret = strtoul(name, &errch, 0);
+		if (!*errch)		/* Is name number - we got directly sid? */
+			return ret;
+	}
+
+	return 0;
+}
+
+/*
  *	Convert name to id
  */
 int name2id(char *name, int qtype, int flag, int *err)
 {
 	if (qtype == USRQUOTA)
 		return user2uid(name, flag, err);
-	else
+	else if (qtype == GRPQUOTA)
 		return group2gid(name, flag, err);
+	else
+		return project2pid(name, flag, err);
 }
 
 /*
@@ -181,14 +202,25 @@ int gid2group(gid_t id, char *buf)
 }
 
 /*
+ *	Convert sid to name
+ */
+int pid2project(int id, char *buf)
+{
+	snprintf(buf, MAXNAMELEN, "#%u", (uint) id);
+	return 0;
+}
+
+/*
  *	Convert id to user/groupname
  */
 int id2name(int id, int qtype, char *buf)
 {
 	if (qtype == USRQUOTA)
 		return uid2user(id, buf);
-	else
+	else if (qtype == GRPQUOTA)
 		return gid2group(id, buf);
+	else
+		return pid2project(id, buf);
 }
 
 /*
@@ -642,6 +674,8 @@ static int hasquota(const char *dev, struct mntent *mnt, int type, int flags)
 		return QF_VFSUNKNOWN;
 	if ((type == GRPQUOTA) && (hasmntopt(mnt, MNTOPT_GRPQUOTA) || hasmntoptarg(mnt->mnt_opts, MNTOPT_GRPJQUOTA)))
 		return QF_VFSUNKNOWN;
+	if ((type == PRJQUOTA) && (hasmntopt(mnt, MNTOPT_PRJJQUOTA)))
+		return QF_VFSUNKNOWN;
 	if ((type == USRQUOTA) && hasmntopt(mnt, MNTOPT_QUOTA))
 		return QF_VFSUNKNOWN;
 	return -1;
@@ -714,6 +748,13 @@ int get_qf_name(struct mount_entry *mnt, int type, int fmt, int flags, char **fi
 		has_quota_file_definition = 1;
 		sstrncpy(qfullname, mnt->me_dir, sizeof(qfullname));
 		sstrncat(qfullname, "/", sizeof(qfullname));
+	}
+	else if (type == PRJQUOTA && (option = str_hasmntopt(mnt->me_opts, MNTOPT_PRJJQUOTA))) {
+		pathname = option + strlen(MNTOPT_PRJJQUOTA);
+		if (*pathname == '=') {
+			has_quota_file_definition = 1;
+			pathname++;
+		}
 	}
 	else if (type == USRQUOTA && (option = str_hasmntopt(mnt->me_opts, MNTOPT_QUOTA))) {
 		pathname = option + strlen(MNTOPT_QUOTA);
@@ -1137,12 +1178,13 @@ alloc:
 			free((char *)devname);
 			devname = sstrdup(loopdev);
 		}
-
 		/* Further we are not interested in mountpoints without quotas and
 		   we don't want to touch them */
 		qfmt[USRQUOTA] = hasquota(devname, mnt, USRQUOTA, flags);
 		qfmt[GRPQUOTA] = hasquota(devname, mnt, GRPQUOTA, flags);
-		if (qfmt[USRQUOTA] < 0 && qfmt[GRPQUOTA] < 0) {
+		qfmt[PRJQUOTA] = hasquota(devname, mnt, PRJQUOTA, flags);
+		if (qfmt[USRQUOTA] < 0 && qfmt[GRPQUOTA] < 0 &&
+		    qfmt[PRJQUOTA] < 0) {
 			free((char *)devname);
 			continue;
 		}

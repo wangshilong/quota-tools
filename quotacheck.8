@@ -26,8 +26,9 @@ By default, only user quotas are checked.
 .B quotacheck
 expects each filesystem to be checked to have quota files named
 .I [a]quota.user
-and
+,
 .I [a]quota.group
+and aquota.project
 located at the root of the associated filesystem.  If a file is not
 present, 
 .B quotacheck
@@ -93,6 +94,11 @@ or on the filesystems specified are to be checked.  This is the default action.
 .TP
 .B -g, --group
 Only group quotas listed in
+.I /etc/mtab
+or on the filesystems specified are to be checked.
+.TP
+.B -P, --project
+Only project quotas listed in
 .I /etc/mtab
 or on the filesystems specified are to be checked.
 .TP
@@ -175,7 +181,7 @@ not allowed to read all the directories on the given filesystem.
 .SH FILES
 .PD 0
 .TP 15
-.B aquota.user or aquota.group
+.B aquota.user, aquota.group or aquota.project
 located at filesystem root with quotas (version 2 quota, non-XFS
 filesystems)
 .TP 15

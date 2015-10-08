@@ -65,7 +65,7 @@ struct dirs {
 static dev_t cur_dev;			/* Device we are working on */
 static int files_done, dirs_done;
 int flags, fmt = -1, cfmt;	/* Options from command line; Quota format to use spec. by user; Actual format to check */
-static int uwant, gwant, ucheck, gcheck;	/* Does user want to check user/group quota; Do we check user/group quota? */
+static int uwant, gwant, pwant, ucheck, gcheck, pcheck;	/* Does user want to check user/group quota; Do we check user/group quota? */
 static char *mntpoint;			/* Mountpoint to check */
 char *progname;
 struct util_dqinfo old_info[MAXQUOTAS];	/* Loaded infos */
@@ -183,7 +183,8 @@ struct dquot *add_dquot(qid_t id, int type)
 /*
  * Add a number of blocks and inodes to a quota.
  */
-static void add_to_quota(int type, ino_t i_num, uid_t i_uid, gid_t i_gid, mode_t i_mode,
+static void add_to_quota(int type, ino_t i_num, uid_t i_uid, gid_t i_gid,
+			 __u32 project_id, mode_t i_mode,
 			 nlink_t i_nlink, loff_t i_space, int need_remember)
 {
 	qid_t wanted;
@@ -191,8 +192,10 @@ static void add_to_quota(int type, ino_t i_num, uid_t i_uid, gid_t i_gid, mode_t
 
 	if (type == USRQUOTA)
 		wanted = i_uid;
-	else
+	else if (type == GRPQUOTA)
 		wanted = i_gid;
+	else
+		wanted = project_id;
 
 	if ((lptr = lookup_dquot(wanted, type)) == NODQUOT)
 		lptr = add_dquot(wanted, type);
@@ -297,9 +300,10 @@ static inline void blit(const char *msg)
 
 static void usage(void)
 {
-	printf(_("Utility for checking and repairing quota files.\n%s [-gucbfinvdmMR] [-F <quota-format>] filesystem|-a\n\n\
+	printf(_("Utility for checking and repairing quota files.\n%s [-guPcbfinvdmMR] [-F <quota-format>] filesystem|-a\n\n\
 -u, --user                check user files\n\
 -g, --group               check group files\n\
+-P, --project             check project files\n\
 -c, --create-files        create new quota files\n\
 -b, --backup              create backups of old quota files\n\
 -f, --force               force check even if quotas are enabled\n\
@@ -331,6 +335,7 @@ static void parse_options(int argcnt, char **argstr)
 		{ "debug", 0, NULL, 'd' },
 		{ "user", 0, NULL, 'u' },
 		{ "group", 0, NULL, 'g' },
+		{ "project", 0, NULL, 'P' },
 		{ "interactive", 0, NULL, 'i' },
 		{ "use-first-dquot", 0, NULL, 'n' },
 		{ "force", 0, NULL, 'f' },
@@ -342,7 +347,7 @@ static void parse_options(int argcnt, char **argstr)
 		{ NULL, 0, NULL, 0 }
 	};
 
-	while ((ret = getopt_long(argcnt, argstr, "VhbcvugidnfF:mMRa", long_opts, NULL)) != -1) {
+	while ((ret = getopt_long(argcnt, argstr, "VhbcvugPidnfF:mMRa", long_opts, NULL)) != -1) {
   	        switch (ret) {
 		  case 'b':
   		          flags |= FL_BACKUPS;
@@ -352,6 +357,9 @@ static void parse_options(int argcnt, char **argstr)
 			  break;
 		  case 'u':
 			  uwant = 1;
+			  break;
+		  case 'P':
+			  pwant = 1;
 			  break;
 		  case 'd':
 			  flags |= FL_DEBUG;
@@ -398,7 +406,7 @@ static void parse_options(int argcnt, char **argstr)
 			usage();
 		}
 	}
-	if (!(uwant | gwant))
+	if (!(uwant | gwant | pwant))
 		uwant = 1;
 	if ((argcnt == optind && !(flags & FL_ALL)) || (argcnt > optind && flags & FL_ALL)) {
 		fputs(_("Bad number of arguments.\n"), stderr);
@@ -410,6 +418,43 @@ static void parse_options(int argcnt, char **argstr)
 		mntpoint = argstr[optind];
 	else
 		mntpoint = NULL;
+}
+
+#define EXT4_IOC_GETPROJECT		_IOR('f', 19, long)
+#define EXT4_IOC_SETPROJECT		_IOW('f', 20, long)
+
+static int get_project_id(const char *name, __u32 *project)
+{
+	struct stat buf;
+	int fd;
+	int ret;
+	int projid;
+	int save_errno = 0;
+
+	if (stat(name, &buf) == -1)
+		return -1;
+
+	fd = open(name, O_RDONLY|O_NONBLOCK);
+	if (fd == -1)
+		return -1;
+
+	ret = ioctl(fd, EXT4_IOC_GETPROJECT, &projid);
+	if (ret < 0) {
+		save_errno = errno;
+		ret = -1;
+	}
+
+	close(fd);
+	if (save_errno)
+		errno = save_errno;
+	if (ret >= 0)
+		*project = projid;
+	/* Project ID is not supported */
+	if (errno == ENOTTY) {
+		*project = 0;
+		ret = 0;
+	}
+	return ret;
 }
 
 #if defined(EXT2_DIRECT)
@@ -425,6 +470,7 @@ static int ext2_direct_scan(const char *device)
 	ext2fs_inode_bitmap inode_dir_map;
 	uid_t uid;
 	gid_t gid;
+	__u32 project_id;
 
 	if ((error = ext2fs_open(device, 0, 0, 0, unix_io_manager, &fs))) {
 		errstr(_("error (%d) while opening %s\n"), (int)error, device);
@@ -451,6 +497,11 @@ static int ext2_direct_scan(const char *device)
 		return -1;
 	}
 
+	if (get_project_id(NULL, &project_id) < 0) { // TODO: update me
+		errstr(_("Cannot get project id of directory %s\n"), strerror(errno));
+		return -1;
+	}
+
 	while (i_num) {
 		if ((i_num == EXT2_ROOT_INO ||
 		     i_num >= EXT2_FIRST_INO(fs->super)) &&
@@ -463,11 +514,15 @@ static int ext2_direct_scan(const char *device)
 			if (inode.i_uid_high | inode.i_gid_high)
 				debug(FL_DEBUG, _("High uid detected.\n"));
 			if (ucheck)
-				add_to_quota(USRQUOTA, i_num, uid, gid,
+				add_to_quota(USRQUOTA, i_num, uid, gid, project_id,
 					     inode.i_mode, inode.i_links_count,
 					     ((loff_t)inode.i_blocks) << 9, 0);
 			if (gcheck)
-				add_to_quota(GRPQUOTA, i_num, uid, gid,
+				add_to_quota(GRPQUOTA, i_num, uid, gid, project_id,
+					     inode.i_mode, inode.i_links_count,
+					     ((loff_t)inode.i_blocks) << 9, 0);
+			if (pcheck)
+				add_to_quota(PRJQUOTA, i_num, uid, gid, project_id,
 					     inode.i_mode, inode.i_links_count,
 					     ((loff_t)inode.i_blocks) << 9, 0);
 			if (S_ISDIR(inode.i_mode))
@@ -499,17 +554,30 @@ static int scan_dir(const char *pathname)
 	loff_t qspace;
 	DIR *dp;
 	int ret;
+	__u32 project_id;
 
 	if (lstat(pathname, &st) == -1) {
 		errstr(_("Cannot stat directory %s: %s\n"), pathname, strerror(errno));
 		goto out;
 	}
+
+	if (get_project_id(pathname, &project_id) < 0) {
+		errstr(_("Cannot get project id of directory %s: %s\n"), pathname, strerror(errno));
+		goto out;
+	}
+
 	qspace = getqsize(pathname, &st);
 	if (ucheck)
-		add_to_quota(USRQUOTA, st.st_ino, st.st_uid, st.st_gid, st.st_mode,
+		add_to_quota(USRQUOTA, st.st_ino, st.st_uid, st.st_gid,
+			     project_id, st.st_mode,
 			     st.st_nlink, qspace, 0);
 	if (gcheck)
-		add_to_quota(GRPQUOTA, st.st_ino, st.st_uid, st.st_gid, st.st_mode,
+		add_to_quota(GRPQUOTA, st.st_ino, st.st_uid, st.st_gid,
+			     project_id, st.st_mode,
+			     st.st_nlink, qspace, 0);
+	if (pcheck)
+		add_to_quota(PRJQUOTA, st.st_ino, st.st_uid, st.st_gid,
+			     project_id, st.st_mode,
 			     st.st_nlink, qspace, 0);
 
 	if ((dp = opendir(pathname)) == (DIR *) NULL)
@@ -545,12 +613,23 @@ static int scan_dir(const char *pathname)
 			dir_stack = new_dir;
 		}
 		else {
+			if (get_project_id(de->d_name, &project_id) < 0) {
+				errstr(_("Cannot get project id of file %s: %s\n"),
+					de->d_name, strerror(errno));
+				goto out;
+			}
 			qspace = getqsize(de->d_name, &st);
 			if (ucheck)
-				add_to_quota(USRQUOTA, st.st_ino, st.st_uid, st.st_gid, st.st_mode,
+				add_to_quota(USRQUOTA, st.st_ino, st.st_uid,
+					     st.st_gid, project_id, st.st_mode,
 					     st.st_nlink, qspace, 1);
 			if (gcheck)
-				add_to_quota(GRPQUOTA, st.st_ino, st.st_uid, st.st_gid, st.st_mode,
+				add_to_quota(GRPQUOTA, st.st_ino, st.st_uid,
+					     st.st_gid, project_id, st.st_mode,
+					     st.st_nlink, qspace, 1);
+			if (pcheck)
+				add_to_quota(PRJQUOTA, st.st_ino, st.st_uid,
+					     st.st_gid, project_id, st.st_mode,
 					     st.st_nlink, qspace, 1);
 			debug(FL_DEBUG, _("\tAdding %s size %lld ino %d links %d uid %u gid %u\n"), de->d_name,
 			      (long long)st.st_size, (int)st.st_ino, (int)st.st_nlink, (int)st.st_uid, (int)st.st_gid);
@@ -894,8 +973,10 @@ static int sub_quota_file(struct mount_entry *mnt, int qtype, int ftype)
 	
 	if (qtype == USRQUOTA)
 		id = st.st_uid;
-	else
+	else if (qtype == GRPQUOTA)
 		id = st.st_gid;
+	else /* TODO: project quota */
+		return 0;
 	if ((d = lookup_dquot(id, qtype)) == NODQUOT) {
 		errstr(_("Quota structure for %s owning quota file not present! Something is really wrong...\n"), _(type2name(qtype)));
 		return -1;
@@ -934,7 +1015,10 @@ static int check_dir(struct mount_entry *mnt)
 	if (gcheck)
 		if (process_file(mnt, GRPQUOTA) < 0)
 			gcheck = 0;
-	if (!ucheck && !gcheck)	/* Nothing to check? */
+	if (pcheck)
+		if (process_file(mnt, PRJQUOTA) < 0)
+			pcheck = 0;
+	if (!ucheck && !gcheck && !pcheck)	/* Nothing to check? */
 		return 0;
 	if (!(flags & FL_NOREMOUNT)) {
 		/* Now we try to remount fs read-only to prevent races when scanning filesystem */
@@ -982,10 +1066,17 @@ start_scan:
 	if (ucheck) {
 		failed |= sub_quota_file(mnt, USRQUOTA, USRQUOTA);
 		failed |= sub_quota_file(mnt, USRQUOTA, GRPQUOTA);
+		failed |= sub_quota_file(mnt, USRQUOTA, PRJQUOTA);
 	}
 	if (gcheck) {
 		failed |= sub_quota_file(mnt, GRPQUOTA, USRQUOTA);
 		failed |= sub_quota_file(mnt, GRPQUOTA, GRPQUOTA);
+		failed |= sub_quota_file(mnt, GRPQUOTA, PRJQUOTA);
+	}
+	if (pcheck) {
+		failed |= sub_quota_file(mnt, PRJQUOTA, USRQUOTA);
+		failed |= sub_quota_file(mnt, PRJQUOTA, GRPQUOTA);
+		failed |= sub_quota_file(mnt, PRJQUOTA, PRJQUOTA);
 	}
 	debug(FL_DEBUG | FL_VERBOSE, _("Checked %d directories and %d files\n"), dirs_done,
 	      files_done);
@@ -998,6 +1089,8 @@ start_scan:
 		failed |= dump_to_file(mnt, USRQUOTA);
 	if (gcheck)
 		failed |= dump_to_file(mnt, GRPQUOTA);
+	if (pcheck)
+		failed |= dump_to_file(mnt, PRJQUOTA);
 out:
 	remove_list();
 	return failed;
@@ -1026,12 +1119,18 @@ static int detect_filename_format(struct mount_entry *mnt, int type)
 		else if ((option = str_hasmntopt(mnt->me_opts, MNTOPT_QUOTA)))
 			option += strlen(MNTOPT_QUOTA);
 	}
-	else {
+	else if (type == GRPQUOTA) {
 		if ((option = str_hasmntopt(mnt->me_opts, MNTOPT_GRPQUOTA)))
 			option += strlen(MNTOPT_GRPQUOTA);
 		else if ((option = str_hasmntopt(mnt->me_opts, MNTOPT_GRPJQUOTA))) {
 			journal = 1;
 			option += strlen(MNTOPT_GRPJQUOTA);
+		}
+	}
+	else {
+		if ((option = str_hasmntopt(mnt->me_opts, MNTOPT_PRJJQUOTA))) {
+			journal = 1;
+			option += strlen(MNTOPT_PRJJQUOTA);
 		}
 	}
 	if (!option)
@@ -1139,6 +1238,7 @@ static int check_all(void)
 	int checked = 0;
 	static int warned;
 	int failed = 0;
+	int type;
 
 	if (init_mounts_scan((flags & FL_ALL) ? 0 : 1, &mntpoint, 0) < 0)
 		die(2, _("Cannot initialize mountpoint scan.\n"));
@@ -1158,10 +1258,21 @@ static int check_all(void)
 			gcheck = 1;
 		else
 			gcheck = 0;
-		if (!ucheck && !gcheck)
+		if (pwant && me_hasquota(mnt, PRJQUOTA))
+			pcheck = 1;
+		else
+			pcheck = 0;
+		if (!ucheck && !gcheck && !pcheck)
 			continue;
 		if (cfmt == -1) {
-			cfmt = detect_filename_format(mnt, ucheck ? USRQUOTA : GRPQUOTA);
+			if (ucheck) {
+				type = USRQUOTA;
+			} else if (gcheck) {
+				type = GRPQUOTA;
+			} else {
+				type = PRJQUOTA;
+			}
+			cfmt = detect_filename_format(mnt, type);
 			if (cfmt == -1) {
 				errstr(_("Cannot guess format from filename on %s. Please specify format on commandline.\n"),
 					mnt->me_devname);
@@ -1174,6 +1285,7 @@ static int check_all(void)
 		if (flags & (FL_VERBOSE | FL_DEBUG) &&
 		    !str_hasmntopt(mnt->me_opts, MNTOPT_USRJQUOTA) &&
 		    !str_hasmntopt(mnt->me_opts, MNTOPT_GRPJQUOTA) &&
+		    !str_hasmntopt(mnt->me_opts, MNTOPT_PRJJQUOTA) &&
 		    !warned &&
 		    (!strcmp(mnt->me_type, MNTTYPE_EXT3) ||
 		     !strcmp(mnt->me_type, MNTTYPE_EXT4) ||

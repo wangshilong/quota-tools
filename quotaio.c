@@ -77,7 +77,6 @@ struct quota_handle *init_io(struct mount_entry *mnt, int type, int fmt, int fla
 		errstr(_("RPC quota format specified for non-NFS filesystem.\n"));
 		goto out_handle;
 	}
-
 	if (!strcmp(mnt->me_type, MNTTYPE_XFS) ||	/* XFS filesystem? */
 	    !strcmp(mnt->me_type, MNTTYPE_GFS2)) {	/* XFS filesystem? */
 		if (fmt != -1 && fmt != QF_XFS) {	/* User wanted some other format? */

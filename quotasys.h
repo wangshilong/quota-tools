@@ -63,6 +63,9 @@ uid_t user2uid(char *, int flag, int *err);
 /* Convert groupname to gid */
 gid_t group2gid(char *, int flag, int *err);
 
+/* Convert project name to gid */
+int project2pid(char *name, int flag, int *err);
+
 /* Convert user/groupname to id */
 int name2id(char *name, int qtype, int flag, int *err);
 
@@ -71,6 +74,9 @@ int uid2user(uid_t, char *);
 
 /* Convert gid to groupname */
 int gid2group(gid_t, char *);
+
+/* Convert sid to name */
+int pid2project(int, char *);
 
 /* Convert id to user/group name */
 int id2name(int id, int qtype, char *buf);

@@ -66,6 +66,9 @@
 /* Define to the home page for this package. */
 #undef PACKAGE_URL
 
+/* Define to the home page for this package. */
+#undef PACKAGE_URL
+
 /* Version of quota tools */
 #undef PACKAGE_VERSION
 

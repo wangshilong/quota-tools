@@ -74,6 +74,7 @@ static int check_info(char *filename, int fd, int type)
 	filesize = lseek(fd, 0, SEEK_END);
 	if (check_blkref(freeblk, blocks) < 0 || dflags & ~V2_DQF_MASK ||
 	    check_blkref(freeent, blocks) < 0 || (filesize + QT_BLKSIZE - 1) >> QT_BLKSIZE_BITS != blocks) {
+	    	printf("%d %d %d %d %d\n", check_blkref(freeblk, blocks), dflags & ~V2_DQF_MASK, check_blkref(freeent, blocks), filesize + QT_BLKSIZE - 1, blocks);
 		errstr(_("WARNING - Quota file info was corrupted.\n"));
 		debug(FL_DEBUG, _("Size of file: %lu\nBlocks: %u Free block: %u Block with free entry: %u Flags: %x\n"),
 		      (unsigned long)filesize, blocks, freeblk, freeent, dflags);

@@ -7,7 +7,7 @@ quota \- display disk usage and limits
 .B -F
 .I format-name
 ] [
-.B -guqvswi
+.B -guPqvswi
 ] [
 .BR -l \ |
 [
@@ -41,6 +41,20 @@ quota \- display disk usage and limits
 ]]
 .B -g
 .IR group ...
+.br
+.B quota
+[
+.B -F
+.I format-name
+] [
+.B -qvswi
+] [
+.BR -l \ |
+[
+.BR -QAm
+]]
+.B -P
+.IR project ...
 .br
 .B quota
 [
@@ -87,6 +101,13 @@ argument(s) restricts the display to the specified group(s).
 .TP
 .B -u, --user
 flag is equivalent to the default.
+.TP
+.B -P, --project
+Print project quotas for the project
+of which the inode is a member.
+The optional
+.B project
+argument(s) restricts the display to the specified project(s).
 .TP
 .B -v, --verbose
 will display quotas on filesystems
@@ -184,7 +205,7 @@ are over quota.
 .SH FILES
 .PD 0
 .TP 20
-.B aquota.user " or " aquota.group
+.B aquota.user ", " aquota.group " or " aquota.project
 quota file at the filesystem root (version 2 quota, non-XFS filesystems)
 .TP 20
 .B quota.user " or " quota.group

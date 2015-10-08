@@ -14,7 +14,7 @@ quotaon, quotaoff \- turn filesystem quotas on and off
 .br
 .B quotaon
 [
-.B \-avugfp
+.B \-avugPfp
 ] [
 .B \-F
 .I format-name
@@ -22,7 +22,7 @@ quotaon, quotaoff \- turn filesystem quotas on and off
 .LP
 .B quotaoff
 [
-.B \-vugp
+.B \-vugPp
 ]
 [
 .B \-x
@@ -53,7 +53,9 @@ directory of the specified filesystem and be named either
 .IR aquota.group
 (for version 2 group quota), or
 .IR quota.group
-(for version 1 group quota).
+(for version 1 group quota),
+.IR aquota.project
+(for version 2 project quota).
 .PP
 XFS filesystems are a special case - XFS considers quota
 information as filesystem metadata and uses journaling to provide
@@ -109,6 +111,9 @@ Manipulate user quotas. This is the default.
 .B -g, --group
 Manipulate group quotas.
 .TP
+.B -P, --project
+Manipulate project quotas.
+.TP
 .B -p, --print-state
 Instead of turning quotas on just print state of quotas (ie. whether. quota is on or off)
 .TP
@@ -147,6 +152,9 @@ Manipulate user quotas. This is the default.
 .TP
 .B -g, --group
 Manipulate group quotas.
+.TP
+.B -P, --project
+Manipulate project quotas.
 .TP
 .B -p, --print-state
 Instead of turning quotas off just print state of quotas (ie. whether. quota is on or off)
@@ -201,7 +209,7 @@ This may be done while the filesystem is mounted.
 .SH FILES
 .PD 0
 .TP 20
-.B aquota.user or aquota.group
+.B aquota.user, aquota.group or aquota.project
 quota file at the filesystem root (version 2 quota, non-XFS filesystems)
 .TP
 .B quota.user or quota.group

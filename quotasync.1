@@ -4,13 +4,13 @@ quotasync \- synchronize in-kernel file system usage and limits to disk format
 .SH SYNOPSIS
 .B quotasync
 [
-.B -ug
+.B -ugP
 ] 
 .IR mount-point ...
 .br
 .B quotasync
 [
-.B -ug
+.B -ugP
 ] 
 .B -a
 .br
@@ -34,6 +34,9 @@ Synchronize user usage and limits.
 .B -g, --group
 Synchronize group usage and limits.
 .TP
+.B -P, --project
+Synchronize project usage and limits.
+.TP
 .B -a, --all
 Synchronize usage and limits on all file systems. You have to specify this
 option or to specify desired file systems.
@@ -50,7 +53,7 @@ will terminate with non-zero exit code. Otherwise it will return zero.
 .SH FILES
 .PD 0
 .TP 16
-.B aquota.user " or " aquota.group
+.B aquota.user ", " aquota.group " or " aquota.project
 Quota file at the file system root (version 2 quota, non-XFS/GFS2 file systems).
 .TP 16
 .B quota.user " or " quota.group

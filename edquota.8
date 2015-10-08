@@ -8,7 +8,8 @@ edquota \- edit user quotas
 .I protoname
 ] [
 .BR \-u \ |
-.B \-g
+.B \-g \ |
+.B \-P
 ] [
 .B \-rm
 ] [
@@ -23,7 +24,8 @@ edquota \- edit user quotas
 .B edquota
 [
 .BR \-u \ |
-.B \-g
+.B \-g \ |
+.B \-P
 ] [
 .B \-F
 .I format-name
@@ -36,7 +38,8 @@ edquota \- edit user quotas
 .B edquota
 [
 .BR \-u \ |
-.B \-g
+.B \-g \ |
+.B \-P
 ] [
 .B \-F
 .I format-name
@@ -119,6 +122,9 @@ Edit the user quota. This is the default.
 .B -g, --group
 Edit the group quota.
 .TP
+.B -P, --project
+Edit the project quota.
+.TP
 .B -p, --prototype=\f2protoname\f1
 Duplicate the quotas of the prototypical user
 specified for each user specified.  This is the normal
@@ -156,17 +162,17 @@ are understood. Time limits are printed in the greatest possible time unit such 
 the value is greater than or equal to one.
 .TP
 .B \-T, --edit-times
-Edit time for the user/group when softlimit is enforced. Possible values
+Edit time for the user/group/project when softlimit is enforced. Possible values
 are 'unset' or number and unit. Units are the same as in
 .B \-t
 option.
 .SH FILES
 .PD 0
 .TP 20
-.BR aquota.user " or " aquota.group
+.BR aquota.user ", " aquota.group " or " aquota.project
 quota file at the filesystem root (version 2 quota, non-XFS filesystems)
 .TP
-.BR quota.user " or " quota.group
+.BR quota.user ", " quota.group " or " aquota.project
 quota file at the filesystem root (version 1 quota, non-XFS filesystems)
 .TP
 .B /etc/mtab

@@ -37,6 +37,7 @@
 #define FL_NOCACHE 128	/* Don't cache dquots before resolving */
 #define FL_NOAUTOFS 256	/* Ignore autofs mountpoints */
 #define FL_RAWGRACE 512	/* Print grace times in seconds since epoch */
+#define FL_PROJECT 1024
 
 static int flags, fmt = -1, ofmt = QOF_DEFAULT;
 static char **mnt;
@@ -51,6 +52,7 @@ static void usage(void)
 -v, --verbose               display also users/groups without any usage\n\
 -u, --user                  display information about users\n\
 -g, --group                 display information about groups\n\
+-P, --Project               display information about projects\n\
 -s, --human-readable        show numbers in human friendly units (MB, GB, ...)\n\
 -t, --truncate-names        truncate names to 9 characters\n\
 -p, --raw-grace             print grace time in seconds since epoch\n\
@@ -77,6 +79,7 @@ static void parse_options(int argcnt, char **argstr)
 		{ "verbose", 0, NULL, 'v' },
 		{ "user", 0, NULL, 'u' },
 		{ "group", 0, NULL, 'g' },
+		{ "project", 0, NULL, 'P' },
 		{ "help", 0, NULL, 'h' },
 		{ "truncate-names", 0, NULL, 't' },
 		{ "raw-grace", 0, NULL, 'p' },
@@ -90,7 +93,7 @@ static void parse_options(int argcnt, char **argstr)
 		{ NULL, 0, NULL, 0 }
 	};
 
-	while ((ret = getopt_long(argcnt, argstr, "VavughtspncCiFO:", long_opts, NULL)) != -1) {
+	while ((ret = getopt_long(argcnt, argstr, "VavugPhtspncCiFO:", long_opts, NULL)) != -1) {
 		switch (ret) {
 			case '?':
 			case 'h':
@@ -103,6 +106,9 @@ static void parse_options(int argcnt, char **argstr)
 				break;
 			case 'g':
 				flags |= FL_GROUP;
+				break;
+			case 'P':
+				flags |= FL_PROJECT;
 				break;
 			case 'v':
 				flags |= FL_VERBOSE;
