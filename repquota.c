@@ -162,7 +162,7 @@ static void parse_options(int argcnt, char **argstr)
 		fputs(_("Specified both -n and -t but only one of them can be used.\n"), stderr);
 		exit(1);
 	}
-	if (!(flags & (FL_USER | FL_GROUP)))
+	if (!(flags & (FL_USER | FL_GROUP | FL_PROJECT)))
 		flags |= FL_USER;
 	if (!(flags & FL_ALL)) {
 		mnt = argstr + optind;
@@ -425,6 +425,9 @@ int main(int argc, char **argv)
 
 	if (flags & FL_GROUP)
 		report(GRPQUOTA);
+
+	if (flags & FL_PROJECT)
+		report(PRJQUOTA);
 
 	if (ofmt == QOF_XML)
 		printf("</repquota>\n");
